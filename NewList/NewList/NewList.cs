@@ -7,29 +7,29 @@ using System.Threading.Tasks;
 
 namespace NewList
 {
-    class NewList<T> : IEnumerable
+    partial class NewList<T> : IEnumerable
     {
         Node<T> first = null;
         Node<T> last = null;
         public int Count
         {
-            get { return FindSize(first); }
+            get;
+            set;
         }
         public Func<Node<T>, bool> SortRule
         {
             get;
             set;
         }
-
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return new ListIEnumerator<T>(ToArray());
+            return new ListIEnumerator(this);
         }
 
         public T this[int index]
         {
-            get => Find(index).value;
-            set { Find(index).value = value; }
+            get => FindNodeByIndex(index).value;
+            set { FindNodeByIndex(index).value = value; }
         }
 
         public void Append(T value)
@@ -46,6 +46,7 @@ namespace NewList
                 newNode.previous = last;
                 last = newNode;
             }
+            Count++;
         }
         public void Prepend(T value)
         {
@@ -61,19 +62,19 @@ namespace NewList
                 newNode.next = first;
                 first = newNode;
             }
+            Count++;
         }
         public void Insert(int index, T value)
         {
-            if (index < 0 || index > FindSize(first) - 1)
+            if (index < 0 || index > Count - 1)
             {
                 throw new ListExeption("Неверный индекс");
             }
-
             if (index == 0)
             {
                 Prepend(value);
             }
-            else if (index == FindSize(first))
+            else if (index == Count)
             {
                 Append(value);
             }
@@ -81,100 +82,86 @@ namespace NewList
             {
                 Node<T> newNode = new Node<T>(value);
                 Node<T> nowNode = first;
-                for (int i = index; i != 1; i--)
-                {
-                    nowNode = nowNode.next;
-                }
-
+                newNode = FindNodeByIndex(index);
                 Node<T> nextNode = nowNode.next;
                 nowNode.next = newNode;
                 newNode.previous = nowNode;
                 newNode.next = nextNode;
                 nextNode.previous = newNode;
+                Count++;
             }
         }
 
 
         public void Remove(T Value)
         {
-            if (Find(Value) != null)
+            if (Find(Value) == null)
             {
-                Node<T> now = Find(Value);
-                if (now.Equals(first))
+                throw new ListExeption("Нет элемента");
+            }
+            Node<T> now = Find(Value);
+            if (now.Equals(first))
+            {
+                first = first.next;
+                first.previous = null;
+            }
+            else if (now.Equals(last))
+            {
+                last = last.previous;
+                last.next = null;
+            }
+            else
+            {
+                Remover(now);
+            }
+            Count--;
+        }
+        public void RemoveAt(int index)
+        {
+            if (index < 0 || index > Count - 1 || first == null)
+            {
+                throw new ListExeption("Неверный индекс");
+            }
+            if (index == 0)
+            {
+                if (first.next != null)
                 {
                     first = first.next;
                     first.previous = null;
                 }
-                else if (now.Equals(last))
-                {
-                    last = last.previous;
-                    last.next = null;
-                }
                 else
                 {
-                    Remover(now);
+                    first = null;
+                    last = null;
                 }
+            }
+            else if (index == Count)
+            {
+                last = last.previous;
+                last.next = null;
             }
             else
             {
-                throw new ListExeption("Нет элемента");
+                Remover(FindNodeByIndex(index));
             }
-        }
-        public void RemoveAt(int index)
-        {
-            if (index < 0 || index > FindSize(first) - 1 || first == null)
-            {
-                throw new ListExeption("Неверный индекс");
-            }
-            else
-            {
-                if (index == 0)
-                {
-                    if (first.next != null)
-                    {
-                        first = first.next;
-                        first.previous = null;
-                    }
-                    else
-                    {
-                        first = null;
-                        last = null;
-                    }
-
-                }
-                else if (index == FindSize(first))
-                {
-                    last = last.previous;
-                    last.next = null;
-                }
-                else
-                {
-                    Remover(Find(index));
-                }
-            }
+            Count--;
         }
         public ref T FindRef(T value)
         {
-            if (Find(value) != null)
-            {
-                return ref Find(value).value;
-            }
-            else
+            if (Find(value) == null)
             {
                 throw new ListExeption("Нет элемента");
             }
-
+            return ref Find(value).value;
+            
         }
         public T FindId(int index)
         {
-            if (Find(index) != null)
-            {
-                return Find(index).value;
-            }
-            else
+            if (FindNodeByIndex(index) == null)
             {
                 throw new ListExeption("Неверный индекс");
             }
+            return FindNodeByIndex(index).value;
         }
         T[] ToArray()
         {
@@ -182,21 +169,17 @@ namespace NewList
             {
                 return new T[0];
             }
-
             if (last == first)
             {
                 return new T[1] { last.value };
             }
-
-            T[] result = new T[FindSize(first)];
-
+            T[] result = new T[Count];
             Node<T> now = first;
             for (int i = 0; now != null; i++)
             {
                 result[i] = now.value;
                 now = now.next;
             }
-
             return result;
         }
         public void Sort()
@@ -219,7 +202,6 @@ namespace NewList
                     {
                         now = now.next;
                     }
-                    
                 }
             }
         }
@@ -248,15 +230,18 @@ namespace NewList
                 prevNode.next = nextNode;
             if (nextNode != null)
                 nextNode.previous = prevNode;
-
         }
-        Node<T> Find(int index)
+        Node<T> FindNodeByIndex(int index)
         {
             if (first == null)
                 return null;
             Node<T> now = first;
             while (index != 0 && Count != 1)
             {
+                if(now == null)
+                {
+                    return null;
+                }
                 now = now.next;
                 index--;
             }
@@ -273,34 +258,18 @@ namespace NewList
             }
             return now;
         }
-
-        int FindSize(Node<T> now)
-        {
-            if (now == null)
-                return 0;
-
-            int size = 1;
-            while (now.next != null)
-            {
-                size++;
-                now = now.next;
-            }
-            return size;
-        }
         /// Функции доп. задание
         public NewList<T> Split(out NewList<T> outList)
         {
-            
             NewList<T> newList = new NewList<T>();
             outList = new NewList<T>();
-            Node<T> middle = Find(Count / 2);
+            Node<T> middle = FindNodeByIndex(Count / 2);
             outList.last = middle.previous;
             outList.first = first;
             newList.first = middle;
             newList.last = last;
             outList.last.next = null;
             middle.previous = null;
-            //Console.WriteLine($"Конец 1 - {outList.last.value} Начало 2 - {middle.value}");
             return newList;
         }
         public NewList<T> Merge(in NewList<T> listToMerge)
@@ -334,7 +303,6 @@ namespace NewList
                         nodesToAdd.RemoveAt(0);
                         break;
                     }
-                    
                 }
                 else
                 {
@@ -374,19 +342,17 @@ namespace NewList
                 {
                     result.Append(t);
                 }
-                 
             }
             return result;
         }
         private void FastSort(out NewList<NewList<T>> lists, NewList<T> listToSort)
         {
-            
             int startSize = listToSort.Count;
             lists = new NewList<NewList<T>> {};
             lists.Append(listToSort);
-            while(startSize != lists.FindSize(lists.first))
+            while(startSize != lists.Count)
             {
-                int n = lists.FindSize(lists.first);
+                int n = lists.Count;
                 for (int i = 0; i != n; i++)
                 {
                     NewList<T> secondList;
